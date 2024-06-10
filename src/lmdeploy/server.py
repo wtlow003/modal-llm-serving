@@ -3,6 +3,17 @@ import subprocess
 import modal
 from modal import App, Image, Secret, gpu
 
+########## CONSTANTS ##########
+
+
+# define model for serving and path to store in modal container
+MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+MODEL_DIR = f"/models/{MODEL_NAME}"
+SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
+HF_SECRET = Secret.from_name("huggingface-secret")
+SECONDS = 60  # for timeout
+
+
 ########## UTILS FUNCTIONS ##########
 
 
@@ -34,30 +45,24 @@ def download_hf_model(model_dir: str, model_name: str):
 ########## IMAGE DEFINITION ##########
 
 # define image for modal environment
-lmdeploy_image = Image.from_registry(
-    "openmmlab/lmdeploy:v0.4.2",
-).pip_install(["lmdeploy[all]", "huggingface_hub", "hf-transfer"])
-
-# define model for serving and path to store in modal container
-MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
-MODEL_DIR = f"/models/{MODEL_NAME}"
-SERVE_MODEL_NAME = "meta--llama3-8b-instruct"
-HF_SECRET = Secret.from_name("huggingface-secret")
-SECONDS = 60  # for timeout
-
-# adding model weights as step for container setup
-lmdeploy_image = lmdeploy_image.env({"HF_HUB_ENABLE_HF_TRANSFER": "1"}).run_function(
-    download_hf_model,
-    timeout=20 * SECONDS,
-    kwargs={"model_dir": MODEL_DIR, "model_name": MODEL_NAME},
-    secrets=[HF_SECRET],
+lmdeploy_image = (
+    Image.from_registry(
+        "openmmlab/lmdeploy:v0.4.2",
+    )
+    .pip_install(["lmdeploy[all]", "huggingface_hub", "hf-transfer"])
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .run_function(
+        download_hf_model,
+        timeout=20 * SECONDS,
+        kwargs={"model_dir": MODEL_DIR, "model_name": MODEL_NAME},
+        secrets=[HF_SECRET],
+    )
 )
-
 
 ########## APP SETUP ##########
 
 
-app = App("lmdeploy-meta-llama3-8b")
+app = App("lmdeploy-mistralai--mistral-7b-instruct-v02")
 
 NO_GPU = 1
 TOKEN = "secret12345"
@@ -67,6 +72,9 @@ TOKEN = "secret12345"
     image=lmdeploy_image,
     gpu=gpu.A10G(count=NO_GPU),
     container_idle_timeout=20 * SECONDS,
+    # https://modal.com/docs/guide/concurrent-inputs
+    concurrency_limit=1,  # fix at 1 to test concurrency within 1 server setup
+    allow_concurrent_inputs=256,  # max concurrent input into container
 )
 @modal.web_server(port=23333, startup_timeout=60 * SECONDS)
 def serve():

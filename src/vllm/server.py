@@ -100,6 +100,5 @@ def serve():
         --max-model-len 4092 \
         --chat-template chat_template.jinja \
         --tensor-parallel-size {NO_GPU} \
-        --enable-chunked-prefill
     """
     subprocess.Popen(cmd, shell=True)
