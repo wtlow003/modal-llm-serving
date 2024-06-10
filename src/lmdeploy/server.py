@@ -34,16 +34,14 @@ def download_hf_model(model_dir: str, model_name: str):
 ########## IMAGE DEFINITION ##########
 
 # define image for modal environment
-lmdeploy_image = (
-    Image.debian_slim(python_version="3.10")
-    .apt_install(["build-essential"])
-    .pip_install(["lmdeploy[all]", "huggingface_hub", "hf-transfer"])
-)
+lmdeploy_image = Image.from_registry(
+    "openmmlab/lmdeploy:v0.4.2",
+).pip_install(["lmdeploy[all]", "huggingface_hub", "hf-transfer"])
 
 # define model for serving and path to store in modal container
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
 MODEL_DIR = f"/models/{MODEL_NAME}"
-SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
+SERVE_MODEL_NAME = "meta--llama3-8b-instruct"
 HF_SECRET = Secret.from_name("huggingface-secret")
 SECONDS = 60  # for timeout
 
@@ -59,7 +57,7 @@ lmdeploy_image = lmdeploy_image.env({"HF_HUB_ENABLE_HF_TRANSFER": "1"}).run_func
 ########## APP SETUP ##########
 
 
-app = App("lmdeploy-mistralai--mistral-7b-instruct-v02")
+app = App("lmdeploy-meta-llama3-8b")
 
 NO_GPU = 1
 TOKEN = "secret12345"
@@ -68,9 +66,9 @@ TOKEN = "secret12345"
 @app.function(
     image=lmdeploy_image,
     gpu=gpu.A10G(count=NO_GPU),
-    container_idle_timeout=60 * SECONDS,
+    container_idle_timeout=20 * SECONDS,
 )
-@modal.web_server(port=23333, startup_timeout=20 * SECONDS)
+@modal.web_server(port=23333, startup_timeout=60 * SECONDS)
 def serve():
-    cmd = f"lmdeploy serve api_server {MODEL_DIR} --model-name {SERVE_MODEL_NAME} --server-port 23333"
+    cmd = f"lmdeploy serve api_server {MODEL_DIR} --model-name {SERVE_MODEL_NAME} --server-port 23333 --session-len 4092"
     subprocess.Popen(cmd, shell=True)

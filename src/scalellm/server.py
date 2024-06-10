@@ -3,6 +3,7 @@ import subprocess
 import modal
 from modal import App, Image, Secret, gpu
 
+
 ########## UTILS FUNCTIONS ##########
 
 
@@ -34,19 +35,21 @@ def download_hf_model(model_dir: str, model_name: str):
 ########## IMAGE DEFINITION ##########
 
 # define image for modal environment
-sglang_image = Image.debian_slim(python_version="3.10").pip_install(
-    ["sglang[all]", "huggingface_hub", "hf-transfer"]
+scalellm_image = Image.from_registry("ubuntu:22.04", add_python="3.10").pip_install(
+    # fmt: off
+    ["scalellm", "huggingface_hub", "hf-transfer", "transformers"]
+    # fmt: on
 )
 
 # define model for serving and path to store in modal container
 MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
 MODEL_DIR = f"/models/{MODEL_NAME}"
-SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
+# SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
 HF_SECRET = Secret.from_name("huggingface-secret")
 SECONDS = 60  # for timeout
 
 # adding model weights as step for container setup
-sglang_image = sglang_image.env({"HF_HUB_ENABLE_HF_TRANSFER": "1"}).run_function(
+scalellm_image = scalellm_image.env({"HF_HUB_ENABLE_HF_TRANSFER": "0"}).run_function(
     download_hf_model,
     timeout=20 * SECONDS,
     kwargs={"model_dir": MODEL_DIR, "model_name": MODEL_NAME},
@@ -57,19 +60,19 @@ sglang_image = sglang_image.env({"HF_HUB_ENABLE_HF_TRANSFER": "1"}).run_function
 ########## APP SETUP ##########
 
 
-app = App("sglang-mistralai--mistral-7b-instruct-v02")
+app = App("scalellm-mistralai--mistral-7b-instruct-v02")
 
 NO_GPU = 1
 TOKEN = "secret12345"
 
 
 @app.function(
-    image=sglang_image,
+    image=scalellm_image,
     gpu=gpu.A10G(count=NO_GPU),
     container_idle_timeout=20 * SECONDS,
     allow_concurrent_inputs=100,
 )
-@modal.web_server(port=8000, startup_timeout=60 * SECONDS)
+@modal.web_server(port=8080, startup_timeout=60 * SECONDS)
 def serve():
-    cmd = f"python -m sglang.launch_server --model-path {MODEL_DIR} --host 0.0.0.0 --port 8000"
+    cmd = f"python3 -m scalellm.serve.api_server --model {MODEL_DIR} --host 0.0.0.0 --port 8080"
     subprocess.Popen(cmd, shell=True)

@@ -3,6 +3,13 @@ import subprocess
 import modal
 from modal import App, Image, Secret, gpu
 
+# define model for serving and path to store in modal container
+MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+MODEL_DIR = f"/models/{MODEL_NAME}"
+SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
+HF_SECRET = Secret.from_name("huggingface-secret")
+SECONDS = 60  # for timeout
+
 ########## UTILS FUNCTIONS ##########
 
 
@@ -41,21 +48,15 @@ tgi_image = (
     )
     .dockerfile_commands("ENTRYPOINT []")
     .pip_install(["huggingface_hub", "hf-transfer"])
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .run_function(
+        download_hf_model,
+        timeout=20 * SECONDS,
+        kwargs={"model_dir": MODEL_DIR, "model_name": MODEL_NAME},
+        secrets=[HF_SECRET],
+    )
 )
 
-# define model for serving and path to store in modal container
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
-MODEL_DIR = f"/models/{MODEL_NAME}"
-SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
-HF_SECRET = Secret.from_name("huggingface-secret")
-SECONDS = 60  # for timeout
-
-tgi_image = tgi_image.env({"HF_HUB_ENABLE_HF_TRANSFER": "1"}).run_function(
-    download_hf_model,
-    timeout=20 * SECONDS,
-    kwargs={"model_dir": MODEL_DIR, "model_name": MODEL_NAME},
-    secrets=[HF_SECRET],
-)
 
 ########## APP SETUP ##########
 
@@ -63,7 +64,7 @@ tgi_image = tgi_image.env({"HF_HUB_ENABLE_HF_TRANSFER": "1"}).run_function(
 app = App("tgi-mistralai--mistral-7b-instruct-v02")
 
 
-NO_GPU = 4
+NO_GPU = 1
 TOKEN = "secret12345"
 
 
