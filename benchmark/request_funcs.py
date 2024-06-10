@@ -1,7 +1,5 @@
 import asyncio
 import json
-import math
-import random
 import sys
 import time
 import traceback
@@ -9,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import AsyncGenerator, Callable, Dict, List, Optional, Union
 
 import aiohttp
+import numpy as np
 from tqdm.asyncio import tqdm
 
 
@@ -58,6 +57,7 @@ async def async_request_openai_api_chat_completions(
         "temperature": request_func_input.temperature,
         "max_tokens": request_func_input.output_len,
         "stream": request_func_input.stream,
+        "best_of": request_func_input.best_of,
     }
     # headers = {"Authorization": f"Bearer {api_key}"}
 
@@ -72,6 +72,7 @@ async def async_request_openai_api_chat_completions(
         async with session.post(url=api_url, json=payload) as response:
             if response.status == 200:
                 async for chunk_bytes in response.content:
+                    token_ts = time.perf_counter()
                     chunk_bytes = chunk_bytes.strip()
                     if not chunk_bytes:
                         continue
@@ -83,7 +84,6 @@ async def async_request_openai_api_chat_completions(
                         latency = time.perf_counter() - start_ts
                     # normal generation process of token
                     else:
-                        token_ts = time.perf_counter()
                         data = json.loads(chunk)
                         delta = data["choices"][0]["delta"]
                         if delta.get("content", None):
@@ -118,17 +118,17 @@ async def async_request_openai_api_chat_completions(
     return output
 
 
-def poisson_interarrival_generator(rate):
-    """Generator to yield Poisson-distributed inter-arrival times.
-    Args:
-        rate (_type_): _description_
-    """
-    while True:
-        # Generate a uniform random number between 0 and 1
-        U = random.random()
-        # Calculate the inter-arrival time using the inverse transform method
-        T = -math.log(U) / rate
-        yield T
+# def poisson_interarrival_generator(rate):
+#     """Generator to yield Poisson-distributed inter-arrival times.
+#     Args:
+#         rate (_type_): _description_
+#     """
+#     while True:
+#         # Generate a uniform random number between 0 and 1
+#         U = random.random()
+#         # Calculate the inter-arrival time using the inverse transform method
+#         T = -math.log(U) / rate
+#         yield T
 
 
 async def get_request(
@@ -147,18 +147,18 @@ async def get_request(
     Yields:
         Iterator[AsyncGenerator]: _description_
     """
-    poisson_generator = poisson_interarrival_generator(request_rate)
     for request in iter(dataset):
         yield request
 
         if request_rate == float("inf"):
             continue
 
-        interval = next(poisson_generator)
-        await asyncio.sleep(interval / 1000.0)
+        interval = np.random.exponential(1.0 / request_rate)
+        await asyncio.sleep(interval)
 
 
 ASYNC_REQUEST_FUNC: Dict[str, Callable] = {
     "vllm": async_request_openai_api_chat_completions,
     "tgi": async_request_openai_api_chat_completions,
+    "lmdeploy": async_request_openai_api_chat_completions,
 }

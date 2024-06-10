@@ -69,7 +69,7 @@ def calculate_metrics(outputs, duration, tokenizer, logger):
     metrics = BenchmarkMetrics(
         completed=completed,
         failed=failed,
-        req_throughput=completed / duration,
+        req_throughput=(completed / duration) * 60,
         token_throughput=sum(actual_output_lens) / duration,
         mean_ttft_ms=np.mean(ttfts or 0)
         * 1000,  # ttfts is empty if streaming is not supported by backend
@@ -100,18 +100,18 @@ def generate_metrics_display(metrics: List[BenchmarkMetrics]):
     ROW_NAMES_MAPPING: Dict[str, str] = {
         "completed": "Completed Requests",
         "failed": "Failed Requests",
-        "req_throughput": "Request Throughput (req/s)",
+        "req_throughput": "Request Throughput (req/min)",
         "token_throughput": "Token Throughput (token/s)",
         "mean_ttft_ms": "Mean Time to First Token (ms)",
         "median_ttft_ms": "Median Time to First Token (ms)",
-        "p99_ttft_ms": "p99 Percentile Time to First Token",
+        "p99_ttft_ms": "p99 Time to First Token (ms)",
         "mean_tpot_ms": "Mean Time Per Output Token (ms)",
         "median_tpot_ms": "Median Time Per Output Token (ms)",
-        "p99_tpot_ms": "p99 Percentile Time Per Output Token (ms)",
+        "p99_tpot_ms": "p99 Time Per Output Token (ms)",
         "mean_itl_ms": "Mean Inter-Token Latency (ms)",
         "median_itl_ms": "Median Inter-Token Latency (ms)",
-        "p95_itl_ms": "p95 Percentile Inter-Token Latency (ms)",
-        "p99_itl_ms": "p99 Percentile Inter-Token Latency (ms)",
+        "p95_itl_ms": "p95 Inter-Token Latency (ms)",
+        "p99_itl_ms": "p99 Inter-Token Latency (ms)",
     }
 
     # setup table

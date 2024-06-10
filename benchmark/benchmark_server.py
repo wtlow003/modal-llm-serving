@@ -13,7 +13,7 @@ To run the benchmark script, run the following command:
     python benchmark/benchmark_server.py --backend vllm \
         --model "mistralai--mistral-7b-instruct" \
         --num-request 1000 \
-        --request-rate 32 \
+        --request-rate 64 \
         --num-benchmark-runs 3 \
         --max-input-len 1024 \
         --max-output-len 1024 \
@@ -24,12 +24,21 @@ To run the benchmark script, run the following command:
     python benchmark/benchmark_server.py --backend tgi \
         --model "mistralai/Mistral-7B-Instruct" \
         --num-request 1000 \
-        --request-rate 32 \
+        --request-rate 64 \
         --num-benchmark-runs 3 \
         --max-input-len 1024 \
         --max-output-len 1024 \
         --base-url "https://wtlow003--tgi-mistralai--mistral-7b-instruct-v02-serve.modal.run"
 
+    [LMDEPLOY]
+    python benchmark/benchmark_server.py --backend lmdeploy \
+        --model "mistralai--mistral-7b-instruct" \
+        --num-request 1000 \
+        --request-rate 64 \
+        --num-benchmark-runs 3 \
+        --max-input-len 1024 \
+        --max-output-len 1024 \
+        --base-url "https://wtlow003--lmdeploy-mistralai--mistral-7b-instruct-v02-serve.modal.run"
 """
 
 import argparse
