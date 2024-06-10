@@ -6,7 +6,7 @@ import sys
 import time
 import traceback
 from dataclasses import dataclass, field
-from typing import AsyncGenerator, Dict, List, Optional, Union
+from typing import AsyncGenerator, Callable, Dict, List, Optional, Union
 
 import aiohttp
 from tqdm.asyncio import tqdm
@@ -35,9 +35,9 @@ class RequestFuncOutput:
 
 async def async_request_openai_api_chat_completions(
     session: aiohttp.ClientSession,
-    request_func_input,
+    request_func_input: RequestFuncInput,
     pbar: Optional[tqdm] = None,
-):
+) -> RequestFuncOutput:
     """_summary_
 
     Args:
@@ -50,7 +50,7 @@ async def async_request_openai_api_chat_completions(
     api_url = request_func_input.api_url
     assert api_url.endswith(
         "v1/chat/completions"
-    ), "OpenAI Chat Completions API URL must end with 'v1/chat/completions'"
+    ), "vLLM Chat Completions API URL must end with 'v1/chat/completions'"
 
     payload = {
         "model": request_func_input.model,
@@ -67,6 +67,7 @@ async def async_request_openai_api_chat_completions(
     ttft = 0.0
     start_ts = time.perf_counter()
     most_recent_ts = start_ts
+    latency = 0.0
     try:
         async with session.post(url=api_url, json=payload) as response:
             if response.status == 200:
@@ -76,7 +77,7 @@ async def async_request_openai_api_chat_completions(
                         continue
 
                     chunk = chunk_bytes.decode("utf-8")[len("data: ") :]
-                    # last chunk
+                    # last chunk indicator for some api setup
                     if chunk == "[DONE]":
                         # overall time from start of request to end of request
                         latency = time.perf_counter() - start_ts
@@ -100,12 +101,12 @@ async def async_request_openai_api_chat_completions(
                             # treat latest processed token as last time marker
                         most_recent_ts = token_ts
 
+                # iteration through all chunks
+                output.latency = (
+                    latency if latency else time.perf_counter() - start_ts
+                )  # if chunk api does not return "END" in last chunk
                 output.generated_text = generated_text
                 output.success = True
-                output.latency = latency
-            else:
-                print(response)
-                print(payload)
 
     except Exception:
         output.success = False
@@ -155,3 +156,9 @@ async def get_request(
 
         interval = next(poisson_generator)
         await asyncio.sleep(interval / 1000.0)
+
+
+ASYNC_REQUEST_FUNC: Dict[str, Callable] = {
+    "vllm": async_request_openai_api_chat_completions,
+    "tgi": async_request_openai_api_chat_completions,
+}

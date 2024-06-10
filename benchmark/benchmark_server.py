@@ -8,13 +8,28 @@ NOTE: This benchmark script is heavily referenced from vLLM's existing benchmark
 Additional enhancement(s) were made to benchmark static batching, multiple benchmark runs, metrics display etc.
 
 To run the benchmark script, run the following command:
-    python benchmark/server.py --model "mistralai--mistral-7b-instruct" \
+
+    [vLLM]
+    python benchmark/benchmark_server.py --backend vllm \
+        --model "mistralai--mistral-7b-instruct" \
         --num-request 1000 \
         --request-rate 32 \
-        --num-benchmark-runs 1 \
+        --num-benchmark-runs 3 \
         --max-input-len 1024 \
         --max-output-len 1024 \
         --base-url "https://wtlow003--vllm-mistralai--mistral-7b-instruct-v02-serve.modal.run"
+
+
+    [TGI]
+    python benchmark/benchmark_server.py --backend tgi \
+        --model "mistralai/Mistral-7B-Instruct" \
+        --num-request 1000 \
+        --request-rate 32 \
+        --num-benchmark-runs 3 \
+        --max-input-len 1024 \
+        --max-output-len 1024 \
+        --base-url "https://wtlow003--tgi-mistralai--mistral-7b-instruct-v02-serve.modal.run"
+
 """
 
 import argparse
@@ -23,7 +38,7 @@ import os
 import random
 import sys
 import time
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import aiohttp
 import loguru
@@ -31,9 +46,9 @@ import numpy as np
 from dataset import sample_dolly_dataset
 from metrics import calculate_metrics, generate_metrics_display
 from request_funcs import (
+    ASYNC_REQUEST_FUNC,
     RequestFuncInput,
     RequestFuncOutput,
-    async_request_openai_api_chat_completions,
     get_request,
 )
 from tqdm.asyncio import tqdm
@@ -45,7 +60,9 @@ from transformers import (  # noqa: E402
     PreTrainedTokenizerFast,
 )
 
-########## UTILS FUNCTIONS ##########
+##############################################
+############## UTILS FUNCTIONS ###############
+##############################################
 
 
 def setup_logging() -> loguru.logger:  # type: ignore
@@ -59,21 +76,23 @@ def setup_logging() -> loguru.logger:  # type: ignore
     return logger
 
 
-#####################################
-
+##############################################
+################ CONSTANTS ###################
+##############################################
 
 LOGGER = setup_logging()
 AIOHTTP_TIMEOUT = aiohttp.ClientTimeout(total=6 * 60 * 60)
 
 
 async def benchmark(
+    backend: str,
     api_url: str,
     model: str,
     dataset: List[List[Union[List[Dict[str, str]], int]]],
     request_rate: float,
     session: aiohttp.ClientSession,
     tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
-    logger: loguru.logger,  # type: ignore
+    logger,
     enable_tqdm: bool,
 ):
     """_summary_
@@ -93,6 +112,8 @@ async def benchmark(
     Returns:
         _type_: _description_
     """
+    request_func: Callable = ASYNC_REQUEST_FUNC[backend]
+
     test_dataset = dataset[0]
     test_input = RequestFuncInput(
         api_url=api_url,
@@ -101,9 +122,7 @@ async def benchmark(
         output_len=test_dataset[1],  # type: ignore
     )
     logger.info(f"Initial test prompt: {test_input}")
-    test_output = await async_request_openai_api_chat_completions(
-        session=session, request_func_input=test_input
-    )
+    test_output = await request_func(session=session, request_func_input=test_input)
     if not test_output.success:
         logger.error(
             "Initial test run failed - Please make sure benchmark arguments "
@@ -124,12 +143,12 @@ async def benchmark(
         request_func_input = RequestFuncInput(
             api_url=api_url,
             model=model,
-            messages=request[0],
+            messages=request[0],  # type: ignore
             output_len=request[1],  # type: ignore
         )
         tasks.append(
             asyncio.create_task(
-                async_request_openai_api_chat_completions(
+                request_func(
                     session=session, request_func_input=request_func_input, pbar=pbar
                 )
             )
@@ -148,7 +167,7 @@ async def benchmark(
     return metrics
 
 
-async def main(args: argparse.Namespace, logger: loguru.logger):  # type: ignore
+async def main(args: argparse.Namespace, logger):
     """_summary_
 
     Args:
@@ -175,6 +194,7 @@ async def main(args: argparse.Namespace, logger: loguru.logger):  # type: ignore
         for i in range(args.num_benchmark_runs):
             logger.info(f"Starting benchmark run: {i+1}")
             metrics = await benchmark(
+                backend=args.backend,
                 api_url=args.base_url + args.endpoint,
                 model=args.model,
                 dataset=dataset,
@@ -193,6 +213,12 @@ async def main(args: argparse.Namespace, logger: loguru.logger):  # type: ignore
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Benchmark the online serving throughput."
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        choices=["vllm", "tgi", "lmdeploy", "tensorrt-llm"],
+        help="Serving framework to benchmark.",
     )
     parser.add_argument(
         "--base-url",
@@ -263,4 +289,4 @@ if __name__ == "__main__":
         help="Output length for each request.",
     )
     args = parser.parse_args()
-    asyncio.run(main(args, LOGGER))
+    asyncio.run(main(args=args, logger=LOGGER))

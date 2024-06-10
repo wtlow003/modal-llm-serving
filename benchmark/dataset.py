@@ -2,7 +2,6 @@ import os
 from typing import Dict, List, Union
 
 import datasets
-import loguru
 
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 from transformers import (  # noqa: E402
@@ -16,9 +15,9 @@ def sample_dolly_dataset(
     dolly_category: str,
     tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast],
     seed: int,
-    logger: loguru.logger,  # type: ignore
-    max_input_len: int = 1024,
-    max_output_len: int = 1024,
+    logger,
+    max_input_len: int,
+    max_output_len: int,
 ) -> List[List[Union[List[Dict[str, str]], int]]]:
     """Sample benchmark prompts and guided output length from "databricks/databricks-dolly-15k" dataset.
 

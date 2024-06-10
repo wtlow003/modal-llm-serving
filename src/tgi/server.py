@@ -72,6 +72,9 @@ TOKEN = "secret12345"
     image=tgi_image,
     gpu=gpu.A10G(count=NO_GPU),
     container_idle_timeout=20 * SECONDS,
+    # https://modal.com/docs/guide/concurrent-inputs
+    concurrency_limit=1,  # fix at 1 to test concurrency within 1 server setup
+    allow_concurrent_inputs=256,  # max concurrent input into container
 )
 @modal.web_server(port=3000, startup_timeout=60 * SECONDS)
 def serve():

@@ -14,6 +14,7 @@ SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
 HF_SECRET = Secret.from_name("huggingface-secret")
 SECONDS = 60  # for timeout
 
+
 ########## UTILS FUNCTIONS ##########
 
 
@@ -97,8 +98,8 @@ def serve():
     python -m vllm.entrypoints.openai.api_server --model {MODEL_DIR} \
         --served-model-name {SERVE_MODEL_NAME} \
         --max-model-len 4092 \
-        --gpu-memory-utilization 0.7 \
         --chat-template chat_template.jinja \
-        --tensor-parallel-size {NO_GPU}
+        --tensor-parallel-size {NO_GPU} \
+        --enable-chunked-prefill
     """
     subprocess.Popen(cmd, shell=True)
