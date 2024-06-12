@@ -11,24 +11,42 @@ To run the benchmark script, run the following command:
 
     [vLLM]
     python benchmark/benchmark_server.py --backend vllm \
-        --model "mistralai--mistral-7b-instruct" \
+        --model "meta--llama-2-70b" \
+        --num-request 8 \
+        --request-rate 1 \
+        --num-benchmark-runs 3 \
+        --max-input-len 1024 \
+        --max-output-len 1024 \
+        --base-url "https://wtlow003--vllm-meta--llama-2-70b-serve-dev.modal.run"
+
+    python benchmark/benchmark_server.py --backend vllm \
+        --model "qwen-qwen-14b" \
         --num-request 1000 \
         --request-rate 64 \
         --num-benchmark-runs 3 \
         --max-input-len 1024 \
         --max-output-len 1024 \
-        --base-url "https://xxx--vllm-mistralai--mistral-7b-instruct-v02-serve.modal.run"
+        --base-url "https://wtlow003--vllm-qwen-qwen-14b-serve.modal.run"
 
 
     [TGI]
     python benchmark/benchmark_server.py --backend tgi \
-        --model "mistralai/Mistral-7B-Instruct" \
+        --model "meta-llama/Llama-2-70b-hf" \
+        --num-request 10 \
+        --request-rate 1 \
+        --num-benchmark-runs 3 \
+        --max-input-len 1024 \
+        --max-output-len 1024 \
+        --base-url "https://wtlow003--tgi-meta--llama-2-70b-serve-dev.modal.run"
+
+    python benchmark/benchmark_server.py --backend tgi \
+        --model "qwen-qwen-14b" \
         --num-request 1000 \
         --request-rate 64 \
         --num-benchmark-runs 3 \
         --max-input-len 1024 \
         --max-output-len 1024 \
-        --base-url "https://xxx--tgi-mistralai--mistral-7b-instruct-v02-serve.modal.run"
+        --base-url "https://wtlow003--tgi-qwen--qwen-14b-serve.modal.run"
 
     [LMDEPLOY]
     python benchmark/benchmark_server.py --backend lmdeploy \
@@ -270,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--tokenizer",
         type=str,
-        default="mistralai/Mistral-7B-Instruct-v0.2",
+        default="meta-llama/Llama-2-7b-hf",
         help="Name or path of the tokenizer, if not using the default tokenizer.",
     )
     parser.add_argument(

@@ -7,9 +7,9 @@ from modal import App, Image, Secret, gpu
 
 
 # define model for serving and path to store in modal container
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+MODEL_NAME = "meta-llama/Llama-2-70b-hf"
 MODEL_DIR = f"/models/{MODEL_NAME}"
-SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
+SERVE_MODEL_NAME = "meta--llama-2-70b"
 HF_SECRET = Secret.from_name("huggingface-secret")
 SECONDS = 60  # for timeout
 
@@ -53,7 +53,7 @@ lmdeploy_image = (
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
     .run_function(
         download_hf_model,
-        timeout=20 * SECONDS,
+        timeout=60 * SECONDS,
         kwargs={"model_dir": MODEL_DIR, "model_name": MODEL_NAME},
         secrets=[HF_SECRET],
     )
@@ -62,15 +62,15 @@ lmdeploy_image = (
 ########## APP SETUP ##########
 
 
-app = App("lmdeploy-mistralai--mistral-7b-instruct-v02")
+app = App("vllm-meta--llama-2-70b")
 
-NO_GPU = 1
+NO_GPU = 2
 TOKEN = "secret12345"
 
 
 @app.function(
     image=lmdeploy_image,
-    gpu=gpu.A10G(count=NO_GPU),
+    gpu=gpu.A100(count=NO_GPU, size="80GB"),
     container_idle_timeout=20 * SECONDS,
     # https://modal.com/docs/guide/concurrent-inputs
     concurrency_limit=1,  # fix at 1 to test concurrency within 1 server setup
@@ -78,5 +78,10 @@ TOKEN = "secret12345"
 )
 @modal.web_server(port=23333, startup_timeout=60 * SECONDS)
 def serve():
-    cmd = f"lmdeploy serve api_server {MODEL_DIR} --model-name {SERVE_MODEL_NAME} --server-port 23333 --session-len 4092"
+    cmd = f"""
+    lmdeploy serve api_server {MODEL_DIR} \
+        --model-name {SERVE_MODEL_NAME} \
+        --server-port 23333 \
+        --session-len 4092
+    """
     subprocess.Popen(cmd, shell=True)

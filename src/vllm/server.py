@@ -8,9 +8,9 @@ from modal import App, Image, Mount, Secret, gpu
 
 
 # define model for serving and path to store in modal container
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+MODEL_NAME = "meta-llama/Llama-2-70b-hf"
 MODEL_DIR = f"/models/{MODEL_NAME}"
-SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
+SERVE_MODEL_NAME = "meta--llama-2-70b"
 HF_SECRET = Secret.from_name("huggingface-secret")
 SECONDS = 60  # for timeout
 
@@ -59,7 +59,7 @@ vllm_image = (
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
     .run_function(
         download_hf_model,
-        timeout=20 * SECONDS,
+        timeout=60 * SECONDS,
         kwargs={"model_dir": MODEL_DIR, "model_name": MODEL_NAME},
         secrets=[HF_SECRET],
     )
@@ -70,18 +70,16 @@ vllm_image = (
 ########## APP SETUP ##########
 
 
-app = App("vllm-mistralai--mistral-7b-instruct-v02")
+app = App("vllm-meta--llama-2-70b")
 
-NO_GPU = 1
+NO_GPU = 2
 TOKEN = "secret12345"  # for demo purposes, for production, you can use Modal secrets to store token
-LOCAL_TEMPLATE_PATH = (
-    Path(__file__).parent.parent.parent / "template_mistral_7b_instruct.jinja"
-)
+LOCAL_TEMPLATE_PATH = Path(__file__).parent.parent.parent / "template_llama_2.jinja"
 
 
 @app.function(
     image=vllm_image,
-    gpu=gpu.A10G(count=NO_GPU),
+    gpu=gpu.A100(count=NO_GPU, size="80GB"),
     container_idle_timeout=20 * SECONDS,
     mounts=[
         Mount.from_local_file(
@@ -97,8 +95,9 @@ def serve():
     cmd = f"""
     python -m vllm.entrypoints.openai.api_server --model {MODEL_DIR} \
         --served-model-name {SERVE_MODEL_NAME} \
-        --max-model-len 4092 \
+        --max-model-len 2048 \
         --chat-template chat_template.jinja \
         --tensor-parallel-size {NO_GPU} \
+        --trust-remote-code
     """
     subprocess.Popen(cmd, shell=True)

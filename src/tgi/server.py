@@ -4,9 +4,9 @@ import modal
 from modal import App, Image, Secret, gpu
 
 # define model for serving and path to store in modal container
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+MODEL_NAME = "meta-llama/Llama-2-70b-hf"
 MODEL_DIR = f"/models/{MODEL_NAME}"
-SERVE_MODEL_NAME = "mistralai--mistral-7b-instruct"
+SERVE_MODEL_NAME = "meta--llama-2-70b"
 HF_SECRET = Secret.from_name("huggingface-secret")
 SECONDS = 60  # for timeout
 
@@ -61,16 +61,16 @@ tgi_image = (
 ########## APP SETUP ##########
 
 
-app = App("tgi-mistralai--mistral-7b-instruct-v02")
+app = App("tgi-meta--llama-2-70b")
 
 
-NO_GPU = 1
+NO_GPU = 2
 TOKEN = "secret12345"
 
 
 @app.function(
     image=tgi_image,
-    gpu=gpu.A10G(count=NO_GPU),
+    gpu=gpu.A100(count=NO_GPU, size="80GB"),
     container_idle_timeout=20 * SECONDS,
     # https://modal.com/docs/guide/concurrent-inputs
     concurrency_limit=1,  # fix at 1 to test concurrency within 1 server setup
@@ -78,5 +78,11 @@ TOKEN = "secret12345"
 )
 @modal.web_server(port=3000, startup_timeout=60 * SECONDS)
 def serve():
-    cmd = f"text-generation-launcher --model-id {MODEL_DIR} --hostname 0.0.0.0 --port 3000"
+    cmd = f"""
+    text-generation-launcher --model-id {MODEL_DIR} \
+        --hostname 0.0.0.0 \
+        --port 3000 \
+        --max-input-tokens 1024 \
+        --max-total-tokens 2048
+    """
     subprocess.Popen(cmd, shell=True)
