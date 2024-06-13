@@ -120,4 +120,4 @@ python benchmark/benchmark_server.py --backend vllm \
 ```
 > [!IMPORTANT]
 >
-> Note: Replace the `--base-url` with your own deployment url as indicated upon successful deployment with `modal deploy`.
+> **NOTE**: Replace the `--base-url` with your own deployment url as indicated upon successful deployment with `modal deploy`.
